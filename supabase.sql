@@ -8,6 +8,7 @@ create table if not exists public.products (
   name text not null,
   price numeric(12,2) not null,
   old_price numeric(12,2),
+  quantity integer not null default 0,
   category text not null default 'grocery',
   description text,
   image_url text,
@@ -15,6 +16,8 @@ create table if not exists public.products (
   featured boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+alter table public.products add column if not exists quantity integer not null default 0;
 
 alter table public.products enable row level security;
 
