@@ -1,0 +1,6 @@
+const grid=document.getElementById('grid');document.getElementById('year').textContent=new Date().getFullYear();
+function esc(v=''){return String(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+async function load(){try{if(!window.NF_SUPABASE_URL||!window.NF_SUPABASE_KEY||window.NF_SUPABASE_URL.includes('PASTE_')){grid.innerHTML='<div class="loading">Supabase সেটআপ করার পর পণ্য এখানে দেখা যাবে।</div>';return}
+const db=supabase.createClient(window.NF_SUPABASE_URL,window.NF_SUPABASE_KEY);const {data,error}=await db.from('products').select('*').order('created_at',{ascending:false});if(error)throw error;
+if(!data.length){grid.innerHTML='<div class="loading">এখনও কোনো পণ্য যোগ করা হয়নি।</div>';return}
+grid.innerHTML=data.map(p=>{const u=p.image_path?db.storage.from('product-images').getPublicUrl(p.image_path).data.publicUrl:'';return `<article class="card">${u?`<img src="${u}" alt="${esc(p.name)}">`:'<div class="loading">ছবি নেই</div>'}<div class="body"><div class="cat">${esc(p.category||'পণ্য')}</div><h3>${esc(p.name)}</h3><div class="price">${esc(p.price||'')}</div>${p.description?`<p class="desc">${esc(p.description)}</p>`:''}</div></article>`}).join('')}catch(e){console.error(e);grid.innerHTML='<div class="loading">পণ্য লোড করা যাচ্ছে না।</div>'}}load();
