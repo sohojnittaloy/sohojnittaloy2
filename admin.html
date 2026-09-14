@@ -1,1 +1,39 @@
-<!DOCTYPE html><html lang="bn"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>নিত্যালয় Admin</title><link rel="stylesheet" href="admin.css"><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="supabase-config.js"></script></head><body><div class="wrap"><header><a href="index.html">← নিত্যালয় Website</a></header><section id="login" class="panel"><h1>Admin Login</h1><p>পণ্য যোগ ও পরিচালনার জন্য লগইন করুন।</p><input id="email" type="email" placeholder="Email"><input id="password" type="password" placeholder="Password"><button id="loginBtn">Login</button><p id="loginMsg"></p></section><section id="dash" class="panel hidden"><div class="top"><h1>পণ্য যোগ করুন</h1><button id="logout" class="light">Logout</button></div><label>পণ্যের ছবি</label><input id="image" type="file" accept="image/jpeg,image/png,image/webp"><label>পণ্যের নাম</label><input id="name" placeholder="যেমন: ননস্টিক কুকার"><label>ক্যাটাগরি</label><input id="category" placeholder="কুকারিজ / ইলেকট্রনিক"><label>দাম</label><input id="price" placeholder="যেমন: ৳ 1,500"><label>বিবরণ</label><textarea id="description" rows="4"></textarea><button id="save">পণ্য Save করুন</button><p id="msg"></p><h2>পণ্য তালিকা</h2><div id="list"></div></section></div><script src="admin.js"></script></body></html>
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>অ্যাডমিন | সহজ নিত্যালয়</title><link rel="stylesheet" href="styles.css">
+</head>
+<body class="admin-body">
+<header class="site-header"><div class="container nav"><a class="brand" href="index.html">সহজ নিত্যালয়</a><nav><a href="index.html">ওয়েবসাইট দেখুন</a></nav></div></header>
+<main class="admin-wrap"><div class="container">
+  <div id="loginBox" class="admin-panel">
+    <p class="eyebrow">ADMIN LOGIN</p><h1>অ্যাডমিন প্যানেল</h1>
+    <p class="muted">আপনার Supabase Auth ইমেইল ও পাসওয়ার্ড দিয়ে লগইন করুন।</p>
+    <form id="loginForm"><input id="email" type="email" placeholder="ইমেইল" required><input id="password" type="password" placeholder="পাসওয়ার্ড" required><button class="btn primary" type="submit">লগইন</button><p id="loginMsg" class="form-msg"></p></form>
+  </div>
+
+  <div id="dashboard" class="hidden">
+    <div class="admin-top"><div><p class="eyebrow">DASHBOARD</p><h1>পণ্য পরিচালনা</h1></div><button id="logout" class="btn light">লগআউট</button></div>
+    <div class="admin-panel">
+      <h2>নতুন পণ্য যোগ করুন</h2>
+      <form id="productForm" class="product-form">
+        <input id="pName" placeholder="পণ্যের নাম" required>
+        <input id="pPrice" type="number" step="0.01" placeholder="দাম (৳)" required>
+        <input id="pOldPrice" type="number" step="0.01" placeholder="আগের দাম (ঐচ্ছিক)">
+        <select id="pCategory"><option value="grocery">মুদি পণ্য</option><option value="household">গৃহস্থালি</option><option value="new">নতুন পণ্য</option></select>
+        <input id="pImage" type="file" accept="image/*" required>
+        <textarea id="pDescription" placeholder="পণ্যের সংক্ষিপ্ত বিবরণ"></textarea>
+        <label class="check"><input id="pFeatured" type="checkbox"> জনপ্রিয় পণ্য হিসেবে দেখান</label>
+        <button class="btn primary" type="submit">পণ্য যোগ করুন</button>
+        <p id="productMsg" class="form-msg"></p>
+      </form>
+    </div>
+    <div class="admin-panel"><div class="section-head"><h2>আপনার পণ্য</h2><button id="refresh" class="btn light">রিফ্রেশ</button></div><div id="adminProducts" class="admin-products"></div></div>
+  </div>
+</div></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
