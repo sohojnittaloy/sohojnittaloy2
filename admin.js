@@ -1,6 +1,63 @@
-const {createClient}=supabase;const db=createClient(window.SUPABASE_URL,window.SUPABASE_ANON_KEY);const loginBox=document.getElementById("loginBox"),adminBox=document.getElementById("adminBox"),formMsg=document.getElementById("formMsg"),list=document.getElementById("adminProducts");const money=v=>"৳"+Number(v||0).toLocaleString("bn-BD");
-async function auth(){let {data}=await db.auth.getSession();let ok=!!data.session;loginBox.classList.toggle("hidden",ok);adminBox.classList.toggle("hidden",!ok);if(ok)loadProducts()}
-document.getElementById("loginForm").onsubmit=async e=>{e.preventDefault();document.getElementById("loginMsg").textContent="লগইন হচ্ছে...";let {error}=await db.auth.signInWithPassword({email:email.value,password:password.value});document.getElementById("loginMsg").textContent=error?error.message:"";if(!error)auth()};
-document.getElementById("logoutBtn").onclick=async()=>{await db.auth.signOut();auth()};
-document.getElementById("productForm").onsubmit=async e=>{e.preventDefault();formMsg.textContent="ছবি আপলোড হচ্ছে...";let file=pImage.files[0];if(!file){formMsg.textContent="ছবি নির্বাচন করুন";return}let ext=(file.name.split(".").pop()||"jpg").toLowerCase(),path=`${crypto.randomUUID()}.${ext}`;let up=await db.storage.from("product-images").upload(path,file,{contentType:file.type});if(up.error){formMsg.textContent="ছবি আপলোড হয়নি: "+up.error.message;return}let pub=db.storage.from("product-images").getPublicUrl(path).data.publicUrl;let {error}=await db.from("products").insert({name:pName.value.trim(),price:Number(pPrice.value),old_price:pOldPrice.value?Number(pOldPrice.value):null,category:pCategory.value,description:pDescription.value.trim(),featured:pFeatured.checked,image_url:pub,storage_path:path});if(error){await db.storage.from("product-images").remove([path]);formMsg.textContent="পণ্য যোগ হয়নি: "+error.message;return}formMsg.textContent="✅ পণ্য যোগ হয়েছে";e.target.reset();loadProducts()};
-async function loadProducts(){let {data,error}=await db.from("products").select("*").order("created_at",{ascending:false});if(error){list.textContent=error.message;return}list.innerHTML=(data||[]).map(p=>`<div class="adminRow"><img src="${p.image_url||"assets/product-placeholder.svg"}"><div><b>${p.name}</b><small>${money(p.price)} • ${p.category}</small></div><button class="delete" data-id="${p.id}" data-path="${p.storage_path||""}">মুছুন</button></div>`).join("")||"কোনো পণ্য নেই";list.querySelectorAll(".delete").forEach(b=>b.onclick=async()=>{if(!confirm("পণ্যটি মুছবেন?"))return;let {error}=await db.from("products").delete().eq("id",b.dataset.id);if(error){alert(error.message);return}if(b.dataset.path)await db.storage.from("product-images").remove([b.dataset.path]);loadProducts()})}auth();
+const client = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+const loginBox=document.getElementById("loginBox"), dashboard=document.getElementById("dashboard");
+const loginMsg=document.getElementById("loginMsg"), productMsg=document.getElementById("productMsg"), adminProducts=document.getElementById("adminProducts");
+
+function money(v){return `৳${Number(v||0).toLocaleString("bn-BD")}`}
+function esc(s=""){return s.replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+function showMsg(el,msg,bad=false){el.textContent=msg;el.className="form-msg "+(bad?"bad":"ok")}
+
+async function ensureAdminRecord(){
+  const {data:{session}}=await client.auth.getSession();
+  if(!session) return false;
+
+  const {error}=await client.from("admin_users").upsert({user_id:session.user.id},{onConflict:"user_id"});
+  if(error){
+    console.warn("Admin registration failed:", error.message);
+    showMsg(productMsg, "To set up admin approval, add the admin_users policies in Supabase SQL.", true);
+    return false;
+  }
+
+  return true;
+}
+
+async function checkSession(){
+  const {data:{session}}=await client.auth.getSession();
+  if(session){
+    loginBox.classList.add("hidden");
+    dashboard.classList.remove("hidden");
+    const adminReady = await ensureAdminRecord();
+    if(adminReady) loadAdminProducts();
+  }
+}
+document.getElementById("loginForm").addEventListener("submit",async e=>{
+  e.preventDefault(); showMsg(loginMsg,"Signing in...");
+  const {error}=await client.auth.signInWithPassword({email:email.value,password:password.value});
+  if(error) showMsg(loginMsg,error.message,true); else checkSession();
+});
+document.getElementById("logout").addEventListener("click",async()=>{await client.auth.signOut();location.reload()});
+document.getElementById("refresh").addEventListener("click",loadAdminProducts);
+
+document.getElementById("productForm").addEventListener("submit",async e=>{
+  e.preventDefault(); showMsg(productMsg,"Uploading product...");
+  const file=pImage.files[0]; if(!file){showMsg(productMsg,"Please select an image.",true);return;}
+  const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,"-"); const path=`${Date.now()}-${safeName}`;
+  const up=await client.storage.from("product-images").upload(path,file,{upsert:false});
+  if(up.error){showMsg(productMsg,up.error.message,true);return}
+  const {data:urlData}=client.storage.from("product-images").getPublicUrl(path);
+  const {error}=await client.from("products").insert({name:pName.value,price:Number(pPrice.value),old_price:pOldPrice.value?Number(pOldPrice.value):null,category:pCategory.value,description:pDescription.value,image_url:urlData.publicUrl,featured:pFeatured.checked,storage_path:path});
+  if(error){await client.storage.from("product-images").remove([path]);showMsg(productMsg,error.message,true);return}
+  e.target.reset(); showMsg(productMsg,"Product added successfully."); loadAdminProducts();
+});
+
+async function loadAdminProducts(){
+  const {data,error}=await client.from("products").select("*").order("created_at",{ascending:false});
+  if(error){adminProducts.innerHTML=`<p class="form-msg bad">${esc(error.message)}</p>`;return}
+  adminProducts.innerHTML=(data||[]).map(p=>`<div class="admin-product"><img src="${p.image_url}" alt=""><div><b>${esc(p.name)}</b><p>${money(p.price)} · ${esc(p.category)}</p></div><button class="delete-btn" onclick="deleteProduct('${p.id}','${p.storage_path||""}')">Delete</button></div>`).join("") || "<p>No products yet.</p>";
+}
+async function deleteProduct(id,path){
+  if(!confirm("Do you want to delete this product?")) return;
+  if(path) await client.storage.from("product-images").remove([path]);
+  const {error}=await client.from("products").delete().eq("id",id);
+  if(error) alert(error.message); else loadAdminProducts();
+}
+checkSession();

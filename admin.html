@@ -1,7 +1,39 @@
-<!doctype html><html lang="bn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>অ্যাডমিন | সহজ নিত্যালয়</title><link rel="stylesheet" href="styles.css"></head><body>
-<header><div class="container nav"><a class="brand" href="index.html">সহজ নিত্যালয়</a><a class="btn" href="index.html">ওয়েবসাইট</a></div></header>
-<main class="admin"><div class="container">
-<section id="loginBox" class="panel"><b>Admin Login</b><h1>অ্যাডমিন লগইন</h1><form id="loginForm"><label>Email<input id="email" type="email" required></label><label>Password<input id="password" type="password" required></label><button class="btn primary">লগইন</button></form><p id="loginMsg"></p></section>
-<section id="adminBox" class="panel hidden"><div class="head"><div><b>Dashboard</b><h1>পণ্য ব্যবস্থাপনা</h1></div><button id="logoutBtn" class="btn">Logout</button></div>
-<form id="productForm"><label>পণ্যের নাম<input id="pName" required></label><div class="two"><label>দাম<input id="pPrice" type="number" min="0" step=".01" required></label><label>আগের দাম<input id="pOldPrice" type="number" min="0" step=".01"></label></div><label>ক্যাটাগরি<select id="pCategory"><option>মুদি পণ্য</option><option>পানীয়</option><option>স্ন্যাকস</option><option>অন্যান্য</option></select></label><label>বর্ণনা<textarea id="pDescription"></textarea></label><label>ছবি<input id="pImage" type="file" accept="image/*" required></label><label><input id="pFeatured" type="checkbox"> জনপ্রিয় পণ্য</label><button class="btn primary">পণ্য যোগ করুন</button><p id="formMsg"></p></form><hr><h2>বর্তমান পণ্য</h2><div id="adminProducts"></div></section>
-</div></main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="admin.js"></script></body></html>
+<!doctype html>
+<html lang="bn">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin | Shohaj Nittaloy</title><link rel="stylesheet" href="styles.css">
+</head>
+<body class="admin-body">
+<header class="site-header"><div class="container nav"><a class="brand" href="index.html">Shohaj Nittaloy</a><nav><a href="index.html">View Website</a></nav></div></header>
+<main class="admin-wrap"><div class="container">
+  <div id="loginBox" class="admin-panel">
+    <p class="eyebrow">ADMIN LOGIN</p><h1>Admin Panel</h1>
+    <p class="muted">Sign in with your Supabase Auth email and password.</p>
+    <form id="loginForm"><input id="email" type="email" placeholder="Email" required><input id="password" type="password" placeholder="Password" required><button class="btn primary" type="submit">Login</button><p id="loginMsg" class="form-msg"></p></form>
+  </div>
+
+  <div id="dashboard" class="hidden">
+    <div class="admin-top"><div><p class="eyebrow">DASHBOARD</p><h1>Manage Products</h1></div><button id="logout" class="btn light">Logout</button></div>
+    <div class="admin-panel">
+      <h2>Add New Product</h2>
+      <form id="productForm" class="product-form">
+        <input id="pName" placeholder="Product name" required>
+        <input id="pPrice" type="number" step="0.01" placeholder="Price (৳)" required>
+        <input id="pOldPrice" type="number" step="0.01" placeholder="Previous price (optional)">
+        <select id="pCategory"><option value="grocery">Grocery</option><option value="household">Household</option><option value="new">New Arrivals</option></select>
+        <input id="pImage" type="file" accept="image/*" required>
+        <textarea id="pDescription" placeholder="Short product description"></textarea>
+        <label class="check"><input id="pFeatured" type="checkbox"> Show as featured product</label>
+        <button class="btn primary" type="submit">Add Product</button>
+        <p id="productMsg" class="form-msg"></p>
+      </form>
+    </div>
+    <div class="admin-panel"><div class="section-head"><h2>Your Products</h2><button id="refresh" class="btn light">Refresh</button></div><div id="adminProducts" class="admin-products"></div></div>
+  </div>
+</div></main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>

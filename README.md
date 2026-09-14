@@ -1,9 +1,6 @@
-সহজ নিত্যালয় — নতুন clean version
+# নিত্যালয় — Neway Fashion style redesign
+মেহেরপুর | কুকারিজ ও ইলেকট্রনিক পণ্য
 
-১) Supabase Authentication > Users-এ sayfulnws@gmail.com user তৈরি করুন।
-২) SQL Editor-এ supabase.sql পুরোটা Run করুন।
-৩) Settings > API থেকে Project URL ও Publishable/anon key নিয়ে config.js-এ বসান।
-৪) service_role/secret key কখনো config.js-এ দেবেন না।
-৫) সব ফাইল GitHub repository-তে push করুন।
-৬) GitHub Pages চালু করুন।
-৭) admin.html থেকে login করে product যোগ করুন।
+GitHub root-এ index.html, style.css, script.js, admin.html, admin.css, admin.js, supabase-config.js আপলোড করুন।
+আপনার আগের Supabase database চালু থাকলে supabase.sql আবার Run করার প্রয়োজন নেই।
+supabase-config.js-এ আপনার বর্তমান Project URL ও Publishable/Anon key বসিয়ে তারপর upload করুন।
