@@ -25,6 +25,27 @@ create table if not exists public.admin_users (
 
 alter table public.admin_users enable row level security;
 
+drop policy if exists "Authenticated users can view own admin record" on public.admin_users;
+create policy "Authenticated users can view own admin record" on public.admin_users
+for select to authenticated
+using (user_id = auth.uid());
+
+drop policy if exists "Authenticated users can insert own admin record" on public.admin_users;
+create policy "Authenticated users can insert own admin record" on public.admin_users
+for insert to authenticated
+with check (user_id = auth.uid());
+
+drop policy if exists "Authenticated users can update own admin record" on public.admin_users;
+create policy "Authenticated users can update own admin record" on public.admin_users
+for update to authenticated
+using (user_id = auth.uid())
+with check (user_id = auth.uid());
+
+drop policy if exists "Authenticated users can delete own admin record" on public.admin_users;
+create policy "Authenticated users can delete own admin record" on public.admin_users
+for delete to authenticated
+using (user_id = auth.uid());
+
 drop policy if exists "Public can view products" on public.products;
 create policy "Public can view products" on public.products
 for select using (true);
