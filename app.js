@@ -436,8 +436,16 @@ async function load() {
   }
 
 
-  status.textContent =
-    "পণ্য লোড হচ্ছে...";
+  status.textContent = "পণ্য লোড হচ্ছে...";
+  status.classList.add("statusLoading");
+  grid.innerHTML = `
+    <div class="loadingState" role="status" aria-live="polite">
+      <div>
+        <div class="loadingBag" aria-hidden="true"></div>
+        <div class="loadingLabel">পণ্য লোড হচ্ছে...</div>
+      </div>
+    </div>
+  `;
 
 
   try {
@@ -463,9 +471,13 @@ async function load() {
         error
       );
 
-      status.textContent =
-        "পণ্য লোড হয়নি: " +
-        error.message;
+      status.classList.remove("statusLoading");
+      status.textContent = "পণ্য লোড হয়নি";
+      grid.innerHTML = `
+        <div class="loadingError" role="alert">
+          পণ্য লোড করতে সমস্যা হয়েছে। একটু পরে আবার চেষ্টা করুন।
+        </div>
+      `;
 
       return;
 
@@ -476,6 +488,7 @@ async function load() {
       data || [];
 
 
+    status.classList.remove("statusLoading");
     status.textContent =
       products.length
         ? `${products.length}টি পণ্য পাওয়া গেছে`
@@ -489,8 +502,13 @@ async function load() {
 
     console.error(error);
 
-    status.textContent =
-      "পণ্য লোড করতে সমস্যা হয়েছে।";
+    status.classList.remove("statusLoading");
+    status.textContent = "পণ্য লোড হয়নি";
+    grid.innerHTML = `
+      <div class="loadingError" role="alert">
+        পণ্য লোড করতে সমস্যা হয়েছে। একটু পরে আবার চেষ্টা করুন।
+      </div>
+    `;
 
   }
 
