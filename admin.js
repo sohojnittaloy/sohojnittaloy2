@@ -1,26 +1,389 @@
-const {createClient}=supabase;
-const db=createClient(window.SUPABASE_URL,window.SUPABASE_ANON_KEY);
-const loginBox=document.getElementById("loginBox"),adminBox=document.getElementById("adminBox"),form=document.getElementById("productForm"),formMsg=document.getElementById("formMsg"),list=document.getElementById("adminProducts");
-const money=v=>"৳"+Number(v||0).toLocaleString("bn-BD"),mediaBucket=window.MEDIA_BUCKET||"product-media",logoBucket=window.LOGO_BUCKET||"site-assets";
-let editingId=null,editingProduct=null;
-const imageMax=10*1024*1024,videoMax=50*1024*1024,logoMax=5*1024*1024;
-const allowed=(file,types,max)=>file&&types.includes(file.type)&&file.size<=max;
-const applyTheme=theme=>{document.body.setAttribute("data-theme",theme);localStorage.setItem("theme",theme);const btn=document.getElementById("themeToggle");if(btn)btn.textContent=theme==="dark"?"☀️":"🌙"};
-applyTheme(localStorage.getItem("theme")||(window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"));document.getElementById("themeToggle")?.addEventListener("click",()=>applyTheme(document.body.getAttribute("data-theme")==="dark"?"light":"dark"));
-const setMessage=(element,message,ok=false)=>{element.textContent=message;element.className=ok?"ok":"err"};
-async function isAdmin(){const {data:userData}=await db.auth.getUser();if(!userData.user)return false;const {data,error}=await db.from("admin_users").select("user_id").eq("user_id",userData.user.id).maybeSingle();return !error&&!!data}
-async function auth(){const {data}=await db.auth.getSession();const ok=!!data.session&&await isAdmin();loginBox.classList.toggle("hidden",ok);adminBox.classList.toggle("hidden",!ok);if(ok){loadProducts();loadLogo()}}
-document.getElementById("loginForm").onsubmit=async e=>{e.preventDefault();setMessage(document.getElementById("loginMsg"),"Signing in...",true);const {error}=await db.auth.signInWithPassword({email:document.getElementById("email").value,password:document.getElementById("password").value});if(error)setMessage(document.getElementById("loginMsg"),"Login failed. Check your email and password.");else auth()};
-document.getElementById("logoutBtn").onclick=async()=>{await db.auth.signOut();auth()};
-function resetForm(){editingId=null;editingProduct=null;form.reset();document.getElementById("formTitle").textContent="Add Product";document.getElementById("formSubmit").textContent="Add Product";document.getElementById("cancelEdit").classList.add("hidden")}
-function fillForm(product){editingId=product.id;editingProduct=product;document.getElementById("formTitle").textContent="Edit Product";document.getElementById("formSubmit").textContent="Save Changes";document.getElementById("cancelEdit").classList.remove("hidden");document.getElementById("pName").value=product.name||"";document.getElementById("pPrice").value=product.price??"";document.getElementById("pOldPrice").value=product.old_price??"";document.getElementById("pQuantity").value=product.quantity??0;document.getElementById("pCategory").value=product.category||"";document.getElementById("pDescription").value=product.description||"";document.getElementById("pFeatured").checked=!!product.featured;window.scrollTo({top:0,behavior:"smooth"})}
-async function uploadFiles(files,types,max){const urls=[],paths=[];for(const file of files){if(!allowed(file,types,max))throw new Error(`Invalid file: ${file.name}. Check its type and size.`);const ext=(file.name.split(".").pop()||"bin").toLowerCase(),path=`products/${crypto.randomUUID()}.${ext}`;formMsg.textContent=`Uploading ${file.name}...`;const {error}=await db.storage.from(mediaBucket).upload(path,file,{contentType:file.type,upsert:false});if(error)throw error;urls.push(db.storage.from(mediaBucket).getPublicUrl(path).data.publicUrl);paths.push(path)}return {urls,paths}}
-form.onsubmit=async e=>{e.preventDefault();const values={name:document.getElementById("pName").value.trim(),price:Number(document.getElementById("pPrice").value),old_price:document.getElementById("pOldPrice").value?Number(document.getElementById("pOldPrice").value):null,quantity:Number(document.getElementById("pQuantity").value),category:document.getElementById("pCategory").value,description:document.getElementById("pDescription").value.trim(),featured:document.getElementById("pFeatured").checked};if(!values.name||!Number.isFinite(values.price)){setMessage(formMsg,"Product name and a valid price are required.");return}const imageFiles=[...document.getElementById("pImage").files],videoFiles=[...document.getElementById("pVideo").files],newPaths=[];try{const images=await uploadFiles(imageFiles,["image/jpeg","image/png","image/webp"],imageMax),videos=await uploadFiles(videoFiles,["video/mp4","video/webm"],videoMax);newPaths.push(...images.paths,...videos.paths);const oldImages=editingProduct?.image_urls||((editingProduct?.image_url&&editingProduct.storage_path)?[editingProduct.image_url]:[]),oldVideos=editingProduct?.video_urls||[],oldPaths=editingProduct?.media_paths||((editingProduct?.storage_path)?[editingProduct.storage_path]:[]),payload={...values,image_urls:imageFiles.length?images.urls:oldImages,video_urls:videoFiles.length?videos.urls:oldVideos,media_paths:[...oldPaths,...newPaths],image_url:imageFiles.length?images.urls[0]:editingProduct?.image_url||oldImages[0]||null,storage_path:editingProduct?.storage_path||newPaths[0]||null};formMsg.textContent=editingId?"Saving changes...":"Saving product...";const result=editingId?await db.from("products").update(payload).eq("id",editingId):await db.from("products").insert(payload);if(result.error)throw result.error;if(editingId&&(imageFiles.length||videoFiles.length)){const pathsToRemove=(editingProduct?.media_paths||[]).filter(path=>!newPaths.includes(path));if(pathsToRemove.length)await db.storage.from(mediaBucket).remove(pathsToRemove)}setMessage(formMsg,editingId?"Product updated successfully.":"Product added successfully.",true);resetForm();await loadProducts()}catch(error){if(newPaths.length)await db.storage.from(mediaBucket).remove(newPaths);setMessage(formMsg,error.message?.includes("Invalid file")?error.message:"The product could not be saved. Please try again.")}};
-document.getElementById("cancelEdit").onclick=resetForm;
-function renderAdmin(data){list.innerHTML=(data||[]).map(p=>`<div class="adminRow"><img src="${p.image_url||"assets/product-placeholder.svg"}" alt=""><div><b>${p.name}</b><small>${money(p.price)} • ${p.category} • Qty: ${Number(p.quantity||0)}</small></div><button class="edit" data-edit="${p.id}">Edit</button><button class="delete" data-id="${p.id}">Delete</button></div>`).join("")||"No products available";list.querySelectorAll("[data-edit]").forEach(button=>button.onclick=()=>{const product=data.find(item=>item.id===button.dataset.edit);if(product)fillForm(product)});list.querySelectorAll("[data-id]").forEach(button=>button.onclick=()=>deleteProduct(button.dataset.id))}
-async function loadProducts(){const {data,error}=await db.from("products").select("*").order("created_at",{ascending:false});if(error){list.textContent="Products could not be loaded.";return}renderAdmin(data)}
-async function deleteProduct(id){if(!confirm("Delete this product and its uploaded media?"))return;const product=(await db.from("products").select("media_paths,storage_path").eq("id",id).maybeSingle()).data;const {error}=await db.from("products").delete().eq("id",id);if(error){alert("Product deletion failed.");return}const paths=product?.media_paths||((product?.storage_path)?[product.storage_path]:[]);if(paths.length)await db.storage.from(mediaBucket).remove(paths);loadProducts()}
-async function loadLogo(){const {data}=await db.from("site_settings").select("logo_url").eq("id",true).maybeSingle();if(data?.logo_url){document.getElementById("logoPreview").src=data.logo_url;document.getElementById("adminLogo").src=data.logo_url}}
-document.getElementById("logoInput").onchange=e=>{const file=e.target.files[0];if(file){if(!allowed(file,["image/jpeg","image/png","image/webp"],logoMax)){setMessage(document.getElementById("logoMsg"),"Logo must be JPG, PNG, or WebP and no larger than 5MB.");e.target.value="";return}document.getElementById("logoPreview").src=URL.createObjectURL(file)}};
-document.getElementById("logoUpload").onclick=async()=>{const file=document.getElementById("logoInput").files[0];if(!file){setMessage(document.getElementById("logoMsg"),"Choose a logo first.");return}const message=document.getElementById("logoMsg");try{setMessage(message,"Uploading logo...",true);const old=(await db.from("site_settings").select("logo_path").eq("id",true).maybeSingle()).data;const ext=(file.name.split(".").pop()||"jpg").toLowerCase(),path=`logos/${crypto.randomUUID()}.${ext}`,upload=await db.storage.from(logoBucket).upload(path,file,{contentType:file.type});if(upload.error)throw upload.error;const url=db.storage.from(logoBucket).getPublicUrl(path).data.publicUrl,saved=await db.from("site_settings").upsert({id:true,logo_url:url,logo_path:path,updated_at:new Date().toISOString()});if(saved.error)throw saved.error;if(old?.logo_path)await db.storage.from(logoBucket).remove([old.logo_path]);document.getElementById("adminLogo").src=url;setMessage(message,"Logo updated successfully.",true)}catch(error){setMessage(message,"Logo upload failed. Please try again.")}};
-auth();
+const { createClient } = supabase;
+
+const db = createClient(
+  window.SUPABASE_URL,
+  window.SUPABASE_ANON_KEY
+);
+
+const loginBox = document.getElementById("loginBox");
+const adminBox = document.getElementById("adminBox");
+const loginForm = document.getElementById("loginForm");
+const loginMsg = document.getElementById("loginMsg");
+const logoutBtn = document.getElementById("logoutBtn");
+const formMsg = document.getElementById("formMsg");
+const list = document.getElementById("adminProducts");
+
+const emailInput = document.getElementById("email");
+const passwordInput = document.getElementById("password");
+
+const money = v =>
+  "৳" + Number(v || 0).toLocaleString("bn-BD");
+
+
+/* =========================
+   AUTH CHECK
+========================= */
+
+async function checkAuth() {
+  try {
+    const { data, error } = await db.auth.getSession();
+
+    if (error) {
+      console.error(error);
+      showLogin();
+      return;
+    }
+
+    if (data.session) {
+      showAdmin();
+      loadProducts();
+    } else {
+      showLogin();
+    }
+
+  } catch (err) {
+    console.error(err);
+    showLogin();
+  }
+}
+
+
+function showLogin() {
+  loginBox.classList.remove("hidden");
+  adminBox.classList.add("hidden");
+}
+
+
+function showAdmin() {
+  loginBox.classList.add("hidden");
+  adminBox.classList.remove("hidden");
+}
+
+
+/* =========================
+   LOGIN
+========================= */
+
+loginForm.addEventListener("submit", async (e) => {
+
+  e.preventDefault();
+
+  loginMsg.textContent = "লগইন হচ্ছে...";
+
+  const email = emailInput.value.trim();
+  const password = passwordInput.value;
+
+  if (!email || !password) {
+    loginMsg.textContent = "Email এবং Password দিন।";
+    return;
+  }
+
+  try {
+
+    const { data, error } =
+      await db.auth.signInWithPassword({
+        email: email,
+        password: password
+      });
+
+    if (error) {
+      console.error(error);
+
+      loginMsg.textContent =
+        "লগইন হয়নি: " + error.message;
+
+      return;
+    }
+
+    if (!data.session) {
+      loginMsg.textContent =
+        "Login session পাওয়া যায়নি। আবার চেষ্টা করুন।";
+
+      return;
+    }
+
+    loginMsg.textContent = "লগইন সফল হচ্ছে...";
+
+    showAdmin();
+
+    await loadProducts();
+
+    loginMsg.textContent = "";
+
+  } catch (err) {
+
+    console.error(err);
+
+    loginMsg.textContent =
+      "Login error: " + err.message;
+  }
+
+});
+
+
+/* =========================
+   LOGOUT
+========================= */
+
+logoutBtn.addEventListener("click", async () => {
+
+  await db.auth.signOut();
+
+  showLogin();
+
+  loginMsg.textContent = "লগআউট হয়েছে।";
+
+});
+
+
+/* =========================
+   ADD PRODUCT
+========================= */
+
+document.getElementById("productForm").addEventListener(
+  "submit",
+  async (e) => {
+
+    e.preventDefault();
+
+    formMsg.textContent = "ছবি আপলোড হচ্ছে...";
+
+    const file =
+      document.getElementById("pImage").files[0];
+
+    if (!file) {
+      formMsg.textContent = "ছবি নির্বাচন করুন।";
+      return;
+    }
+
+    try {
+
+      const ext =
+        (file.name.split(".").pop() || "jpg")
+          .toLowerCase();
+
+      const path =
+        `${crypto.randomUUID()}.${ext}`;
+
+      const upload =
+        await db.storage
+          .from("product-images")
+          .upload(path, file, {
+            contentType: file.type
+          });
+
+      if (upload.error) {
+        formMsg.textContent =
+          "ছবি আপলোড হয়নি: " +
+          upload.error.message;
+
+        return;
+      }
+
+      const publicUrl =
+        db.storage
+          .from("product-images")
+          .getPublicUrl(path)
+          .data.publicUrl;
+
+      const {
+        error
+      } = await db
+        .from("products")
+        .insert({
+
+          name:
+            document.getElementById("pName")
+              .value.trim(),
+
+          price:
+            Number(
+              document.getElementById("pPrice")
+                .value
+            ),
+
+          old_price:
+            document.getElementById("pOldPrice")
+              .value
+              ? Number(
+                  document.getElementById("pOldPrice")
+                    .value
+                )
+              : null,
+
+          category:
+            document.getElementById("pCategory")
+              .value,
+
+          description:
+            document.getElementById("pDescription")
+              .value.trim(),
+
+          featured:
+            document.getElementById("pFeatured")
+              .checked,
+
+          image_url:
+            publicUrl,
+
+          storage_path:
+            path
+        });
+
+      if (error) {
+
+        await db.storage
+          .from("product-images")
+          .remove([path]);
+
+        formMsg.textContent =
+          "পণ্য যোগ হয়নি: " +
+          error.message;
+
+        return;
+      }
+
+      formMsg.textContent =
+        "✅ পণ্য সফলভাবে যোগ হয়েছে।";
+
+      e.target.reset();
+
+      await loadProducts();
+
+    } catch (err) {
+
+      console.error(err);
+
+      formMsg.textContent =
+        "Error: " + err.message;
+    }
+
+  }
+);
+
+
+/* =========================
+   LOAD PRODUCTS
+========================= */
+
+async function loadProducts() {
+
+  const {
+    data,
+    error
+  } = await db
+    .from("products")
+    .select("*")
+    .order("created_at", {
+      ascending: false
+    });
+
+  if (error) {
+
+    list.textContent =
+      "পণ্য লোড হয়নি: " +
+      error.message;
+
+    return;
+  }
+
+  list.innerHTML =
+    (data || [])
+      .map(p => `
+
+        <div class="adminRow">
+
+          <img
+            src="${p.image_url || "assets/product-placeholder.svg"}"
+            alt=""
+          >
+
+          <div>
+
+            <b>${p.name}</b>
+
+            <small>
+              ${money(p.price)}
+              •
+              ${p.category}
+            </small>
+
+          </div>
+
+          <button
+            class="delete"
+            data-id="${p.id}"
+            data-path="${p.storage_path || ""}"
+          >
+            মুছুন
+          </button>
+
+        </div>
+
+      `)
+      .join("")
+    || "কোনো পণ্য নেই।";
+
+
+  list
+    .querySelectorAll(".delete")
+    .forEach(button => {
+
+      button.addEventListener("click", async () => {
+
+        if (!confirm("পণ্যটি মুছবেন?")) {
+          return;
+        }
+
+        const {
+          error
+        } = await db
+          .from("products")
+          .delete()
+          .eq("id", button.dataset.id);
+
+        if (error) {
+
+          alert(error.message);
+
+          return;
+        }
+
+        if (button.dataset.path) {
+
+          await db.storage
+            .from("product-images")
+            .remove([
+              button.dataset.path
+            ]);
+        }
+
+        loadProducts();
+
+      });
+
+    });
+
+}
+
+
+/* =========================
+   AUTH STATE
+========================= */
+
+db.auth.onAuthStateChange(
+  (_event, session) => {
+
+    if (session) {
+      showAdmin();
+    } else {
+      showLogin();
+    }
+
+  }
+);
+
+
+/* START */
+
+checkAuth();
