@@ -56,6 +56,42 @@ function escapeHTML(value) {
 }
 
 
+function redactFacebookSecrets(value) {
+  return String(value ?? "")
+    .replace(/("?(?:access_token|accessToken|auth_token|authorization|token|secret|api_key|apiKey)"?\s*:\s*)"[^"]*"/gi, '$1"[REDACTED]"')
+    .replace(/(Bearer\s+)[^\s,}"']+/gi, "$1[REDACTED]")
+    .replace(/([?&](?:access_token|accessToken|token|secret|api_key|apiKey)=)[^&\s]+/gi, "$1[REDACTED]");
+}
+
+
+async function getFacebookErrorDetails(facebookError) {
+  const message = redactFacebookSecrets(facebookError?.message || "Unknown Facebook function error");
+  const status = facebookError?.status ?? facebookError?.context?.status ?? "";
+  let details = redactFacebookSecrets(facebookError?.details || "");
+  const context = facebookError?.context;
+
+  if (context && typeof context.text === "function") {
+    try {
+      const responseText = await context.text();
+
+      if (responseText) {
+        try {
+          details = JSON.stringify(JSON.parse(responseText), null, 2);
+        } catch {
+          details = responseText;
+        }
+
+        details = redactFacebookSecrets(details);
+      }
+    } catch {
+      details = details || "Could not read the Facebook function response body.";
+    }
+  }
+
+  return { message, status, details };
+}
+
+
 /* =========================
    HIDE BROKEN CURRENT IMAGE
 ========================= */
@@ -473,13 +509,22 @@ async function addProduct() {
 
       if (facebookError) {
 
-        console.error(
-          "Facebook error:",
-          facebookError
-        );
+        const facebookDiagnostic =
+          await getFacebookErrorDetails(facebookError);
 
+        console.error("Facebook error:", {
+          name: facebookError?.name || "FacebookFunctionError",
+          message: facebookDiagnostic.message,
+          status: facebookDiagnostic.status,
+          details: facebookDiagnostic.details
+        });
+
+        formMsg.style.whiteSpace = "pre-wrap";
         formMsg.textContent =
-          "✅ Product Website-এ Save হয়েছে, কিন্তু Facebook Post হয়নি।";
+          "⚠️ Facebook Auto Post ব্যর্থ হয়েছে\n\n" +
+          "Error:\n" + facebookDiagnostic.message + "\n\n" +
+          "Status:\n" + (facebookDiagnostic.status || "Unavailable") + "\n\n" +
+          "Details:\n" + (facebookDiagnostic.details || "No response details available.");
 
       } else if (
         facebookResult?.success
@@ -496,13 +541,22 @@ async function addProduct() {
 
     } catch (facebookError) {
 
-      console.error(
-        "Facebook function error:",
-        facebookError
-      );
+      const facebookDiagnostic =
+        await getFacebookErrorDetails(facebookError);
 
+      console.error("Facebook function error:", {
+        name: facebookError?.name || "FacebookFunctionError",
+        message: facebookDiagnostic.message,
+        status: facebookDiagnostic.status,
+        details: facebookDiagnostic.details
+      });
+
+      formMsg.style.whiteSpace = "pre-wrap";
       formMsg.textContent =
-        "✅ Product Save হয়েছে, কিন্তু Facebook Auto Post-এ সমস্যা হয়েছে।";
+        "⚠️ Facebook Auto Post ব্যর্থ হয়েছে\n\n" +
+        "Error:\n" + facebookDiagnostic.message + "\n\n" +
+        "Status:\n" + (facebookDiagnostic.status || "Unavailable") + "\n\n" +
+        "Details:\n" + (facebookDiagnostic.details || "No response details available.");
     }
 
 
