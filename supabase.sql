@@ -18,6 +18,11 @@ create table if not exists public.products (
 );
 
 alter table public.products add column if not exists quantity integer not null default 0;
+alter table public.products add column if not exists image_urls jsonb not null default '[]'::jsonb;
+alter table public.products add column if not exists video_urls jsonb not null default '[]'::jsonb;
+alter table public.products add column if not exists media_paths jsonb not null default '[]'::jsonb;
+alter table public.products add column if not exists image_paths jsonb not null default '[]'::jsonb;
+alter table public.products add column if not exists video_paths jsonb not null default '[]'::jsonb;
 
 alter table public.products enable row level security;
 
@@ -25,6 +30,21 @@ create table if not exists public.admin_users (
   user_id uuid primary key references auth.users(id) on delete cascade,
   created_at timestamptz not null default now()
 );
+
+create table if not exists public.site_settings (
+  id boolean primary key default true check (id = true),
+  logo_url text,
+  logo_path text,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.site_settings enable row level security;
+drop policy if exists "Public can view site settings" on public.site_settings;
+create policy "Public can view site settings" on public.site_settings for select using (true);
+drop policy if exists "Admins can manage site settings" on public.site_settings;
+create policy "Admins can manage site settings" on public.site_settings for all to authenticated
+using (exists (select 1 from public.admin_users a where a.user_id = auth.uid()))
+with check (exists (select 1 from public.admin_users a where a.user_id = auth.uid()));
 
 alter table public.admin_users enable row level security;
 
@@ -74,6 +94,10 @@ insert into storage.buckets (id, name, public)
 values ('product-images','product-images',true)
 on conflict (id) do update set public = true;
 
+insert into storage.buckets (id, name, public)
+values ('product-media','product-media',true), ('site-assets','site-assets',true)
+on conflict (id) do update set public = true;
+
 drop policy if exists "Public can view product images" on storage.objects;
 create policy "Public can view product images" on storage.objects
 for select using (bucket_id = 'product-images');
@@ -101,6 +125,18 @@ using (
   bucket_id = 'product-images'
   and exists (select 1 from public.admin_users a where a.user_id = auth.uid())
 );
+
+drop policy if exists "Public can view product media" on storage.objects;
+create policy "Public can view product media" on storage.objects for select using (bucket_id in ('product-media','site-assets'));
+drop policy if exists "Admins can upload product media" on storage.objects;
+create policy "Admins can upload product media" on storage.objects for insert to authenticated
+with check (bucket_id in ('product-media','site-assets') and exists (select 1 from public.admin_users a where a.user_id = auth.uid()));
+drop policy if exists "Admins can update product media" on storage.objects;
+create policy "Admins can update product media" on storage.objects for update to authenticated
+using (bucket_id in ('product-media','site-assets') and exists (select 1 from public.admin_users a where a.user_id = auth.uid()));
+drop policy if exists "Admins can delete product media" on storage.objects;
+create policy "Admins can delete product media" on storage.objects for delete to authenticated
+using (bucket_id in ('product-media','site-assets') and exists (select 1 from public.admin_users a where a.user_id = auth.uid()));
 
 -- প্রথমবার Admin Auth user তৈরি করার পর:
 -- Supabase Dashboard > Authentication > Users থেকে user-এর UUID কপি করুন।
