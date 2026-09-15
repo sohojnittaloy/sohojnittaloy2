@@ -100,6 +100,10 @@ function render() {
         p.image_url ||
         "assets/product-placeholder.svg";
 
+      const videoUrl =
+        p.video_url ||
+        (Array.isArray(p.video_urls) ? p.video_urls[0] : "");
+
 
       const productUrl =
         new URL(
@@ -143,12 +147,19 @@ function render() {
 
           <div class="pic productImageWrap">
 
-            <img
-              src="${image}"
-              alt="${name}"
-              loading="lazy"
-              onerror="this.src='assets/product-placeholder.svg'"
-            >
+            ${videoUrl ? `
+              <button class="videoThumb" type="button" data-video-url="${escapeHTML(videoUrl)}" aria-label="Play video for ${name}">
+                <video src="${escapeHTML(videoUrl)}" poster="${escapeHTML(image)}" muted playsinline preload="metadata"></video>
+                <span class="videoPlay" aria-hidden="true">▶</span>
+              </button>
+            ` : `
+              <img
+                src="${image}"
+                alt="${name}"
+                loading="lazy"
+                onerror="this.src='assets/product-placeholder.svg'"
+              >
+            `}
 
             ${
               p.featured
@@ -241,8 +252,58 @@ function render() {
 
 
   attachShareButtons();
+  attachVideoButtons();
 
 }
+
+
+function closeVideoModal() {
+  const modal = document.getElementById("videoModal");
+  const video = modal?.querySelector("video");
+  if (!modal) return;
+  video?.pause();
+  modal.classList.remove("isOpen");
+  document.body.classList.remove("videoModalOpen");
+}
+
+
+function openVideoModal(url) {
+  let modal = document.getElementById("videoModal");
+
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "videoModal";
+    modal.className = "videoModal";
+    modal.innerHTML = `
+      <div class="videoModalContent" role="dialog" aria-modal="true" aria-label="Product video">
+        <button class="videoModalClose" type="button" aria-label="Close video">×</button>
+        <video controls playsinline></video>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    modal.addEventListener("click", event => {
+      if (event.target === modal || event.target.closest(".videoModalClose")) closeVideoModal();
+    });
+  }
+
+  const video = modal.querySelector("video");
+  video.src = url;
+  modal.classList.add("isOpen");
+  document.body.classList.add("videoModalOpen");
+  video.focus();
+}
+
+
+function attachVideoButtons() {
+  document.querySelectorAll(".videoThumb").forEach(button => {
+    button.addEventListener("click", () => openVideoModal(button.dataset.videoUrl));
+  });
+}
+
+
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape") closeVideoModal();
+});
 
 
 /* =========================================================
