@@ -15,6 +15,18 @@ const navigationStyle = document.createElement("style");
 navigationStyle.textContent = `header .nav{gap:28px}header nav#mainNav{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0}header nav#mainNav a{position:relative;display:inline-flex;align-items:center;min-height:42px;padding:9px 12px;border-radius:10px;color:var(--text);font-size:14px;white-space:nowrap;transition:color .2s ease,background-color .2s ease,transform .2s ease}header nav#mainNav a:hover{color:var(--g);background:rgba(8,127,91,.09);transform:translateY(-1px)}header nav#mainNav a.active{color:var(--g);background:rgba(8,127,91,.12)}header nav#mainNav a.active::after{content:"";position:absolute;left:12px;right:12px;bottom:4px;height:3px;border-radius:999px;background:linear-gradient(90deg,var(--g),#6366f1)}header nav#mainNav a.active:hover{color:var(--g);background:rgba(8,127,91,.16)}.dark header nav#mainNav a{color:#dbeafe}.dark header nav#mainNav a:hover,.dark header nav#mainNav a.active{color:#86efac;background:rgba(134,239,172,.12)}.dark header nav#mainNav a.active::after{background:linear-gradient(90deg,#86efac,#a5b4fc)}@media(max-width:850px){header .nav{gap:12px}header nav#mainNav{display:none;position:absolute;left:4%;right:4%;top:68px;gap:5px;padding:10px;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 30px rgba(15,23,42,.12);align-items:stretch;justify-content:flex-start}header nav#mainNav.open{display:flex;flex-direction:column}header nav#mainNav a{width:100%;min-height:44px;padding:10px 13px}header nav#mainNav a.active::after{left:13px;right:auto;bottom:10px;width:4px;height:24px}.dark header nav#mainNav{background:#18212b;border-color:#334155}}@media(max-width:560px){header nav#mainNav{top:64px}header nav#mainNav a{font-size:15px}}`;
 document.head.appendChild(navigationStyle);
 
+const cardLayoutStyle = document.createElement("style");
+cardLayoutStyle.textContent = `html,body{max-width:100%;overflow-x:hidden}.product-card{height:550px;min-height:550px;max-height:550px;display:flex;flex-direction:column;overflow-x:hidden;overflow-y:hidden;min-width:0}.product-card .productImageWrap{height:220px;min-height:220px;max-height:220px;flex:0 0 220px;overflow-x:hidden;overflow-y:hidden}.product-card .content{flex:1 1 auto;min-height:0;min-width:0;overflow-x:hidden;overflow-y:hidden;display:flex;flex-direction:column}.product-card .productDescription{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;line-clamp:4;overflow:hidden;overflow-wrap:anywhere;word-break:break-word;max-height:6.4em;flex:0 0 auto}.product-card .productActions{display:flex;flex-direction:row;align-items:stretch;gap:8px;margin-top:auto;flex-shrink:0;min-width:0;width:100%;overflow:hidden}.product-card .productActions .btn{flex:1 1 0;min-width:0;width:auto;margin-top:0;padding:9px 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;font-size:clamp(10px,1.05vw,13px);line-height:1.2}.product-card .productActions .whatsapp{width:auto}.product-card .productActions .moreBtn,.product-card .productActions .shareBtn{display:inline-flex;align-items:center;justify-content:center}@media(max-width:850px){.product-card .productActions{gap:6px}.product-card .productActions .btn{font-size:11px;padding-left:4px;padding-right:4px}}@media(max-width:560px){.product-card{height:550px;min-height:550px;max-height:550px}.product-card .productImageWrap{height:205px;min-height:205px;max-height:205px;flex-basis:205px}.product-card .productActions{gap:5px}.product-card .productActions .btn{font-size:10px;padding:8px 3px}}`;
+document.body.appendChild(cardLayoutStyle);
+
+const actionButtonStyle = document.createElement("style");
+actionButtonStyle.textContent = `.product-card .productActions{gap:5px}.product-card .productActions .whatsapp{flex:2.2 1 0}.product-card .productActions .moreBtn,.product-card .productActions .shareBtn{flex:1 1 0}.product-card .productActions .btn{font-size:clamp(10px,1vw,12px);padding-left:5px;padding-right:5px}@media(max-width:850px){.product-card .productActions .btn{font-size:10px;padding-left:3px;padding-right:3px}}`;
+document.body.appendChild(actionButtonStyle);
+
+const cardContentFitStyle = document.createElement("style");
+cardContentFitStyle.textContent = `.product-card .content h3{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;overflow-wrap:anywhere;min-height:0;max-height:3.2em;margin:7px 0}.product-card .productDescription{-webkit-line-clamp:3;line-clamp:3;max-height:4.8em;margin:8px 0}.product-card .priceRow{flex-shrink:0}.product-card .stock{flex-shrink:0}`;
+document.body.appendChild(cardContentFitStyle);
+
 const money = value => "৳" + Number(value || 0).toLocaleString("bn-BD");
 function escapeHTML(value) {
   return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
@@ -58,13 +70,13 @@ function render() {
       <div class="body content">
         <small class="category">${categoryName}</small>
         <h3>${name}</h3>
-        ${description ? `<p class="productDescription">${description}</p>` : ""}
-        <div class="stock${stock > 0 ? "" : " out"}"><span class="stockDot"></span>${stock > 0 ? `স্টকে আছে: ${stock}` : "স্টক শেষ"}</div>
         <div class="priceRow"><strong class="price">${money(product.price)}</strong>${product.old_price ? `<del>${money(product.old_price)}</del>` : ""}</div>
+        <div class="stock${stock > 0 ? "" : " out"}"><span class="stockDot"></span>${stock > 0 ? `স্টকে আছে: ${stock}` : "স্টক শেষ"}</div>
+        ${description ? `<p class="productDescription">${description}</p>` : ""}
         <div class="productActions">
-          <a class="btn primary whatsapp" href="https://wa.me/8801568853909?text=${productMessage(product)}" target="_blank" rel="noopener">🟢 WhatsApp-এ অর্ডার</a>
-          <button class="btn moreBtn" type="button" data-product-id="${escapeHTML(product.id)}">More</button>
-          <button class="btn shareBtn" type="button" data-name="${name}" data-url="${productUrl}">🔗 শেয়ার</button>
+          <a class="btn primary whatsapp" title="WhatsApp-এ অর্ডার" aria-label="WhatsApp-এ অর্ডার" href="https://wa.me/8801568853909?text=${productMessage(product)}" target="_blank" rel="noopener">🟢 WhatsApp</a>
+          <button class="btn moreBtn" title="More product details" type="button" data-product-id="${escapeHTML(product.id)}">🔗 More</button>
+          <button class="btn shareBtn" title="Share product" type="button" data-name="${name}" data-url="${productUrl}">↗ Share</button>
         </div>
       </div>
     </article>`;
