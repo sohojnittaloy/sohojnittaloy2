@@ -5,6 +5,10 @@ const db = createClient(
   window.SUPABASE_ANON_KEY
 );
 
+/* =========================
+   ELEMENTS
+========================= */
+
 const loginBox = document.getElementById("loginBox");
 const adminBox = document.getElementById("adminBox");
 const loginForm = document.getElementById("loginForm");
@@ -29,12 +33,18 @@ const pQuantity = document.getElementById("pQuantity");
 const pCategory = document.getElementById("pCategory");
 const pDescription = document.getElementById("pDescription");
 const pImage = document.getElementById("pImage");
+const pVideo = document.getElementById("pVideo");
 const pFeatured = document.getElementById("pFeatured");
 
 const money = (value) =>
   "৳" + Number(value || 0).toLocaleString("bn-BD");
 
 let editingProduct = null;
+
+
+/* =========================
+   HELPER
+========================= */
 
 function escapeHTML(value) {
   return String(value ?? "")
@@ -44,6 +54,20 @@ function escapeHTML(value) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
+
+
+/* =========================
+   HIDE BROKEN CURRENT IMAGE
+========================= */
+
+document.querySelectorAll('img[alt="Current product image"]').forEach(img => {
+  img.style.display = "none";
+
+  img.addEventListener("error", () => {
+    img.style.display = "none";
+  });
+});
+
 
 /* =========================
    AUTH
@@ -65,21 +89,29 @@ async function checkAuth() {
     } else {
       showLogin();
     }
+
   } catch (error) {
     console.error(error);
     showLogin();
   }
 }
 
+
 function showLogin() {
   loginBox.classList.remove("hidden");
   adminBox.classList.add("hidden");
 }
 
+
 function showAdmin() {
   loginBox.classList.add("hidden");
   adminBox.classList.remove("hidden");
 }
+
+
+/* =========================
+   LOGIN
+========================= */
 
 loginForm.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -95,51 +127,67 @@ loginForm.addEventListener("submit", async (event) => {
   }
 
   try {
-    const { data, error } = await db.auth.signInWithPassword({
-      email,
-      password
-    });
+
+    const { data, error } =
+      await db.auth.signInWithPassword({
+        email,
+        password
+      });
 
     if (error) {
-      console.error(error);
-      loginMsg.textContent = "লগইন হয়নি: " + error.message;
+      loginMsg.textContent =
+        "লগইন হয়নি: " + error.message;
       return;
     }
 
     if (!data.session) {
-      loginMsg.textContent = "Login session পাওয়া যায়নি।";
+      loginMsg.textContent =
+        "Login session পাওয়া যায়নি।";
       return;
     }
 
-    loginMsg.textContent = "লগইন সফল হয়েছে।";
-
     showAdmin();
     await loadProducts();
+
+    loginMsg.textContent =
+      "লগইন সফল হয়েছে।";
 
     setTimeout(() => {
       loginMsg.textContent = "";
     }, 1500);
 
   } catch (error) {
+
     console.error(error);
-    loginMsg.textContent = "Login error: " + error.message;
+
+    loginMsg.textContent =
+      "Login error: " + error.message;
   }
 });
 
+
+/* =========================
+   LOGOUT
+========================= */
+
 logoutBtn.addEventListener("click", async () => {
+
   await db.auth.signOut();
 
   resetEditMode();
   showLogin();
 
-  loginMsg.textContent = "লগআউট হয়েছে।";
+  loginMsg.textContent =
+    "লগআউট হয়েছে।";
 });
+
 
 /* =========================
    PRODUCT FORM
 ========================= */
 
 productForm.addEventListener("submit", async (event) => {
+
   event.preventDefault();
 
   if (editingProduct) {
@@ -147,118 +195,298 @@ productForm.addEventListener("submit", async (event) => {
   } else {
     await addProduct();
   }
+
 });
+
+
+/* =========================
+   UPLOAD IMAGE
+========================= */
+
+async function uploadImage(file) {
+
+  if (!file) return null;
+
+  const ext =
+    (file.name.split(".").pop() || "jpg")
+      .toLowerCase();
+
+  const path =
+    `${crypto.randomUUID()}.${ext}`;
+
+  const upload =
+    await db.storage
+      .from("product-images")
+      .upload(path, file, {
+        contentType: file.type
+      });
+
+  if (upload.error) {
+    throw new Error(
+      "ছবি আপলোড হয়নি: " +
+      upload.error.message
+    );
+  }
+
+  const publicUrl =
+    db.storage
+      .from("product-images")
+      .getPublicUrl(path)
+      .data
+      .publicUrl;
+
+  return {
+    url: publicUrl,
+    path: path
+  };
+}
+
+
+/* =========================
+   UPLOAD VIDEO
+========================= */
+
+async function uploadVideo(file) {
+
+  if (!file) return null;
+
+  const ext =
+    (file.name.split(".").pop() || "mp4")
+      .toLowerCase();
+
+  const path =
+    `${crypto.randomUUID()}.${ext}`;
+
+  const upload =
+    await db.storage
+      .from("product-images")
+      .upload(path, file, {
+        contentType: file.type
+      });
+
+  if (upload.error) {
+    throw new Error(
+      "ভিডিও আপলোড হয়নি: " +
+      upload.error.message
+    );
+  }
+
+  const publicUrl =
+    db.storage
+      .from("product-images")
+      .getPublicUrl(path)
+      .data
+      .publicUrl;
+
+  return {
+    url: publicUrl,
+    path: path
+  };
+}
+
 
 /* =========================
    ADD PRODUCT
 ========================= */
 
 async function addProduct() {
-  formMsg.textContent = "ছবি আপলোড হচ্ছে...";
 
-  const file = pImage.files[0];
+  const imageFile =
+    pImage?.files?.[0] || null;
 
-  if (!file) {
-    formMsg.textContent = "ছবি নির্বাচন করুন।";
+  const videoFile =
+    pVideo?.files?.[0] || null;
+
+  /* Image OR Video required */
+
+  if (!imageFile && !videoFile) {
+
+    formMsg.textContent =
+      "🖼️ অথবা 🎥 অন্তত একটি Image বা Video নির্বাচন করুন।";
+
     return;
   }
 
   try {
-    /* ---------- Upload Image ---------- */
 
-    const ext =
-      (file.name.split(".").pop() || "jpg").toLowerCase();
+    let uploadedImage = null;
+    let uploadedVideo = null;
 
-    const path = `${crypto.randomUUID()}.${ext}`;
+    /* IMAGE */
 
-    const upload = await db.storage
-      .from("product-images")
-      .upload(path, file, {
-        contentType: file.type
-      });
+    if (imageFile) {
 
-    if (upload.error) {
       formMsg.textContent =
-        "ছবি আপলোড হয়নি: " + upload.error.message;
-      return;
+        "🖼️ ছবি আপলোড হচ্ছে...";
+
+      uploadedImage =
+        await uploadImage(imageFile);
     }
 
-    const publicUrl =
-      db.storage
-        .from("product-images")
-        .getPublicUrl(path)
-        .data
-        .publicUrl;
+    /* VIDEO */
 
-    /* ---------- Save Product ---------- */
+    if (videoFile) {
 
-    formMsg.textContent = "Product Save হচ্ছে...";
+      formMsg.textContent =
+        "🎥 ভিডিও আপলোড হচ্ছে...";
+
+      uploadedVideo =
+        await uploadVideo(videoFile);
+    }
+
+    /* PRODUCT DATA */
+
+    formMsg.textContent =
+      "Product Save হচ্ছে...";
 
     const productData = {
-      name: pName.value.trim(),
-      price: Number(pPrice.value),
-      old_price: pOldPrice.value
-        ? Number(pOldPrice.value)
-        : null,
-      quantity: Number(pQuantity.value || 0),
-      category: pCategory.value,
-      description: pDescription.value.trim(),
-      featured: pFeatured.checked,
-      image_url: publicUrl,
-      storage_path: path
+
+      name:
+        pName.value.trim(),
+
+      price:
+        Number(pPrice.value),
+
+      old_price:
+        pOldPrice.value
+          ? Number(pOldPrice.value)
+          : null,
+
+      quantity:
+        Number(pQuantity.value || 0),
+
+      category:
+        pCategory.value,
+
+      description:
+        pDescription.value.trim(),
+
+      featured:
+        pFeatured.checked,
+
+      image_url:
+        uploadedImage?.url || null,
+
+      storage_path:
+        uploadedImage?.path || null,
+
+      video_url:
+        uploadedVideo?.url || null,
+
+      video_storage_path:
+        uploadedVideo?.path || null
     };
 
-    const { data: savedProduct, error } =
+
+    /* SAVE DATABASE */
+
+    const {
+      data: savedProduct,
+      error
+    } =
       await db
         .from("products")
         .insert(productData)
         .select()
         .single();
 
+
     if (error) {
-      await db.storage
-        .from("product-images")
-        .remove([path]);
+
+      /* Cleanup image */
+
+      if (uploadedImage?.path) {
+        await db.storage
+          .from("product-images")
+          .remove([
+            uploadedImage.path
+          ]);
+      }
+
+      /* Cleanup video */
+
+      if (uploadedVideo?.path) {
+        await db.storage
+          .from("product-images")
+          .remove([
+            uploadedVideo.path
+          ]);
+      }
 
       formMsg.textContent =
-        "পণ্য যোগ হয়নি: " + error.message;
+        "পণ্য যোগ হয়নি: " +
+        error.message;
 
       return;
     }
 
-    /* ---------- Facebook Auto Post ---------- */
+
+    /* =========================
+       FACEBOOK AUTO POST
+    ========================= */
 
     formMsg.textContent =
-      "✅ Product Save হয়েছে। এখন Facebook-এ Post হচ্ছে...";
+      "✅ Product Save হয়েছে। Facebook-এ Post হচ্ছে...";
+
 
     try {
-      const { data: facebookResult, error: facebookError } =
-        await db.functions.invoke("facebook-auto-post", {
-          body: {
-            name: savedProduct.name,
-            price: savedProduct.price,
-            old_price: savedProduct.old_price,
-            quantity: savedProduct.quantity,
-            category: savedProduct.category,
-            description: savedProduct.description,
-            image_url: savedProduct.image_url,
-            product_url:
-              "https://sohojnittaloy.github.io/sohojnittaloy2/"
+
+      const {
+        data: facebookResult,
+        error: facebookError
+      } =
+        await db.functions.invoke(
+          "facebook-auto-post",
+          {
+            body: {
+
+              name:
+                savedProduct.name,
+
+              price:
+                savedProduct.price,
+
+              old_price:
+                savedProduct.old_price,
+
+              quantity:
+                savedProduct.quantity,
+
+              category:
+                savedProduct.category,
+
+              description:
+                savedProduct.description,
+
+              image_url:
+                savedProduct.image_url,
+
+              video_url:
+                savedProduct.video_url,
+
+              product_url:
+                "https://sohojnittaloy.github.io/sohojnittaloy2/"
+            }
           }
-        });
+        );
+
 
       if (facebookError) {
-        console.error("Facebook error:", facebookError);
+
+        console.error(
+          "Facebook error:",
+          facebookError
+        );
 
         formMsg.textContent =
-          "✅ Product Website-এ Save হয়েছে, কিন্তু Facebook Post হয়নি। " +
-          "Error: " +
-          facebookError.message;
+          "✅ Product Website-এ Save হয়েছে, কিন্তু Facebook Post হয়নি।";
 
-      } else if (facebookResult?.success) {
+      } else if (
+        facebookResult?.success
+      ) {
 
         formMsg.textContent =
-          "🎉 Product সফলভাবে Website-এ Save হয়েছে এবং Facebook-এ Automatic Post হয়েছে!";
+          "🎉 Product Website-এ Save হয়েছে এবং Facebook Auto Post হয়েছে!";
 
       } else {
 
@@ -268,18 +496,24 @@ async function addProduct() {
 
     } catch (facebookError) {
 
-      console.error("Facebook function error:", facebookError);
+      console.error(
+        "Facebook function error:",
+        facebookError
+      );
 
       formMsg.textContent =
         "✅ Product Save হয়েছে, কিন্তু Facebook Auto Post-এ সমস্যা হয়েছে।";
     }
 
-    /* ---------- Reset ---------- */
+
+    /* RESET */
 
     productForm.reset();
+
     pQuantity.value = "0";
 
     await loadProducts();
+
 
   } catch (error) {
 
@@ -290,11 +524,13 @@ async function addProduct() {
   }
 }
 
+
 /* =========================
    EDIT PRODUCT
 ========================= */
 
 function startEdit(product) {
+
   editingProduct = product;
 
   formTitle.textContent =
@@ -303,20 +539,39 @@ function startEdit(product) {
   formSubmit.textContent =
     "💾 পরিবর্তন সংরক্ষণ করুন";
 
-  cancelEdit.classList.remove("hidden");
+  cancelEdit.classList.remove(
+    "hidden"
+  );
 
-  pName.value = product.name || "";
-  pPrice.value = product.price ?? "";
-  pOldPrice.value = product.old_price ?? "";
-  pQuantity.value = product.quantity ?? 0;
-  pCategory.value = product.category || "";
-  pDescription.value = product.description || "";
-  pFeatured.checked = !!product.featured;
+  pName.value =
+    product.name || "";
+
+  pPrice.value =
+    product.price ?? "";
+
+  pOldPrice.value =
+    product.old_price ?? "";
+
+  pQuantity.value =
+    product.quantity ?? 0;
+
+  pCategory.value =
+    product.category || "";
+
+  pDescription.value =
+    product.description || "";
+
+  pFeatured.checked =
+    !!product.featured;
 
   pImage.required = false;
 
+  if (pVideo) {
+    pVideo.required = false;
+  }
+
   formMsg.textContent =
-    "✏️ আপনি এখন এই পণ্যটি edit করছেন। নতুন ছবি দিলে ছবিও পরিবর্তন হবে।";
+    "✏️ আপনি এখন এই পণ্যটি edit করছেন। নতুন ছবি/ভিডিও দিলে সেটিও পরিবর্তন হবে।";
 
   productForm.scrollIntoView({
     behavior: "smooth",
@@ -324,61 +579,61 @@ function startEdit(product) {
   });
 }
 
+
 /* =========================
    UPDATE PRODUCT
 ========================= */
 
 async function updateProduct() {
-  formMsg.textContent = "পণ্য আপডেট হচ্ছে...";
+
+  formMsg.textContent =
+    "পণ্য আপডেট হচ্ছে...";
 
   try {
 
     let imageUrl =
-      editingProduct.image_url || null;
+      editingProduct.image_url ||
+      null;
 
     let storagePath =
-      editingProduct.storage_path || null;
+      editingProduct.storage_path ||
+      null;
 
-    const newFile = pImage.files[0];
+    let videoUrl =
+      editingProduct.video_url ||
+      null;
 
-    /* ---------- New Image ---------- */
+    let videoStoragePath =
+      editingProduct.video_storage_path ||
+      null;
 
-    if (newFile) {
+
+    const newImage =
+      pImage?.files?.[0] || null;
+
+    const newVideo =
+      pVideo?.files?.[0] || null;
+
+
+    /* NEW IMAGE */
+
+    if (newImage) {
 
       formMsg.textContent =
-        "নতুন ছবি আপলোড হচ্ছে...";
+        "🖼️ নতুন ছবি আপলোড হচ্ছে...";
 
-      const ext =
-        (newFile.name.split(".").pop() || "jpg").toLowerCase();
-
-      const newPath =
-        `${crypto.randomUUID()}.${ext}`;
-
-      const upload = await db.storage
-        .from("product-images")
-        .upload(newPath, newFile, {
-          contentType: newFile.type
-        });
-
-      if (upload.error) {
-
-        formMsg.textContent =
-          "নতুন ছবি আপলোড হয়নি: " +
-          upload.error.message;
-
-        return;
-      }
+      const uploaded =
+        await uploadImage(newImage);
 
       imageUrl =
-        db.storage
-          .from("product-images")
-          .getPublicUrl(newPath)
-          .data
-          .publicUrl;
+        uploaded.url;
 
-      storagePath = newPath;
+      storagePath =
+        uploaded.path;
 
-      if (editingProduct.storage_path) {
+      if (
+        editingProduct.storage_path
+      ) {
 
         await db.storage
           .from("product-images")
@@ -388,25 +643,84 @@ async function updateProduct() {
       }
     }
 
-    /* ---------- Update Database ---------- */
+
+    /* NEW VIDEO */
+
+    if (newVideo) {
+
+      formMsg.textContent =
+        "🎥 নতুন ভিডিও আপলোড হচ্ছে...";
+
+      const uploaded =
+        await uploadVideo(newVideo);
+
+      videoUrl =
+        uploaded.url;
+
+      videoStoragePath =
+        uploaded.path;
+
+      if (
+        editingProduct.video_storage_path
+      ) {
+
+        await db.storage
+          .from("product-images")
+          .remove([
+            editingProduct.video_storage_path
+          ]);
+      }
+    }
+
+
+    /* UPDATE DATABASE */
 
     const { error } =
       await db
         .from("products")
         .update({
-          name: pName.value.trim(),
-          price: Number(pPrice.value),
-          old_price: pOldPrice.value
-            ? Number(pOldPrice.value)
-            : null,
-          quantity: Number(pQuantity.value || 0),
-          category: pCategory.value,
-          description: pDescription.value.trim(),
-          featured: pFeatured.checked,
-          image_url: imageUrl,
-          storage_path: storagePath
+
+          name:
+            pName.value.trim(),
+
+          price:
+            Number(pPrice.value),
+
+          old_price:
+            pOldPrice.value
+              ? Number(pOldPrice.value)
+              : null,
+
+          quantity:
+            Number(pQuantity.value || 0),
+
+          category:
+            pCategory.value,
+
+          description:
+            pDescription.value.trim(),
+
+          featured:
+            pFeatured.checked,
+
+          image_url:
+            imageUrl,
+
+          storage_path:
+            storagePath,
+
+          video_url:
+            videoUrl,
+
+          video_storage_path:
+            videoStoragePath
+
         })
-        .eq("id", editingProduct.id);
+        .eq(
+          "id",
+          editingProduct.id
+        );
+
 
     if (error) {
 
@@ -417,6 +731,7 @@ async function updateProduct() {
       return;
     }
 
+
     formMsg.textContent =
       "✅ পণ্য সফলভাবে Update হয়েছে।";
 
@@ -424,22 +739,29 @@ async function updateProduct() {
 
     await loadProducts();
 
+
   } catch (error) {
 
     console.error(error);
 
     formMsg.textContent =
-      "Update error: " + error.message;
+      "Update error: " +
+      error.message;
   }
 }
+
 
 /* =========================
    CANCEL EDIT
 ========================= */
 
-cancelEdit.addEventListener("click", () => {
-  resetEditMode();
-});
+cancelEdit.addEventListener(
+  "click",
+  () => {
+    resetEditMode();
+  }
+);
+
 
 function resetEditMode() {
 
@@ -451,16 +773,23 @@ function resetEditMode() {
   formSubmit.textContent =
     "Add Product";
 
-  cancelEdit.classList.add("hidden");
+  cancelEdit.classList.add(
+    "hidden"
+  );
 
   productForm.reset();
 
   pQuantity.value = "0";
 
-  pImage.required = true;
+  pImage.required = false;
+
+  if (pVideo) {
+    pVideo.required = false;
+  }
 
   formMsg.textContent = "";
 }
+
 
 /* =========================
    LOAD PRODUCTS
@@ -471,13 +800,20 @@ async function loadProducts() {
   list.innerHTML =
     "পণ্য লোড হচ্ছে...";
 
-  const { data, error } =
+  const {
+    data,
+    error
+  } =
     await db
       .from("products")
       .select("*")
-      .order("created_at", {
-        ascending: false
-      });
+      .order(
+        "created_at",
+        {
+          ascending: false
+        }
+      );
+
 
   if (error) {
 
@@ -488,16 +824,52 @@ async function loadProducts() {
     return;
   }
 
+
   list.innerHTML =
     (data || [])
       .map(product => `
 
         <div class="adminRow">
 
-          <img
-            src="${product.image_url || "assets/product-placeholder.svg"}"
-            alt=""
-          >
+          <div>
+
+            ${
+              product.image_url
+                ? `
+                  <img
+                    src="${escapeHTML(product.image_url)}"
+                    alt=""
+                    style="
+                      width:80px;
+                      height:80px;
+                      object-fit:cover;
+                      border-radius:10px;
+                    "
+                  >
+                `
+                : ""
+            }
+
+            ${
+              product.video_url
+                ? `
+                  <video
+                    src="${escapeHTML(product.video_url)}"
+                    controls
+                    preload="metadata"
+                    style="
+                      width:80px;
+                      height:80px;
+                      object-fit:cover;
+                      border-radius:10px;
+                      margin-left:6px;
+                    "
+                  ></video>
+                `
+                : ""
+            }
+
+          </div>
 
           <div>
 
@@ -515,6 +887,7 @@ async function loadProducts() {
             </small>
 
           </div>
+
 
           <div
             class="adminActions"
@@ -539,6 +912,7 @@ async function loadProducts() {
               class="delete"
               data-id="${product.id}"
               data-path="${product.storage_path || ""}"
+              data-video-path="${product.video_storage_path || ""}"
             >
               মুছুন
             </button>
@@ -552,7 +926,10 @@ async function loadProducts() {
       ||
       "কোনো পণ্য নেই।";
 
-  /* ---------- Edit Buttons ---------- */
+
+  /* =========================
+     EDIT BUTTON
+  ========================= */
 
   list
     .querySelectorAll(".edit")
@@ -578,7 +955,10 @@ async function loadProducts() {
 
     });
 
-  /* ---------- Delete Buttons ---------- */
+
+  /* =========================
+     DELETE BUTTON
+  ========================= */
 
   list
     .querySelectorAll(".delete")
@@ -597,7 +977,10 @@ async function loadProducts() {
           }
 
           button.disabled = true;
-          button.textContent = "মুছছে...";
+
+          button.textContent =
+            "মুছছে...";
+
 
           const { error } =
             await db
@@ -608,6 +991,7 @@ async function loadProducts() {
                 button.dataset.id
               );
 
+
           if (error) {
 
             alert(
@@ -616,12 +1000,19 @@ async function loadProducts() {
             );
 
             button.disabled = false;
-            button.textContent = "মুছুন";
+
+            button.textContent =
+              "মুছুন";
 
             return;
           }
 
-          if (button.dataset.path) {
+
+          /* DELETE IMAGE */
+
+          if (
+            button.dataset.path
+          ) {
 
             await db.storage
               .from("product-images")
@@ -630,13 +1021,30 @@ async function loadProducts() {
               ]);
           }
 
+
+          /* DELETE VIDEO */
+
+          if (
+            button.dataset.videoPath
+          ) {
+
+            await db.storage
+              .from("product-images")
+              .remove([
+                button.dataset.videoPath
+              ]);
+          }
+
+
           await loadProducts();
 
         }
       );
 
     });
+
 }
+
 
 /* =========================
    AUTH STATE
@@ -654,7 +1062,8 @@ db.auth.onAuthStateChange(
   }
 );
 
-/* =========================
+
+/* =========================git add admin.js
    START
 ========================= */
 
